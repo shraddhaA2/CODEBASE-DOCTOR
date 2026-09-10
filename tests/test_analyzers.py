@@ -46,12 +46,54 @@ def test_ruff_adapter_normalization(tmp_path):
     assert f1.rule_id == "ruff:F401"
     assert f1.file_path == "app.py"
 
-    # S101
+    # S101: assert used is deterministically low severity
     f2 = findings[1]
     assert f2.analyzer == "ruff"
     assert f2.category == "security"
-    assert f2.severity == "high"
+    assert f2.severity == "low"
     assert f2.rule_id == "ruff:S101"
+
+
+def test_ruff_s101_does_not_become_high():
+    from app.analyzers.ruff import classify_ruff_rule
+    category, severity = classify_ruff_rule("S101")
+    assert category == "security"
+    assert severity == "low"
+    assert severity != "high"
+
+
+def test_ruff_genuine_high_security_rules_remain_high():
+    from app.analyzers.ruff import classify_ruff_rule
+    # Exec, hardcoded passwords, unsafe deserialization, shell=True, SQL injection
+    high_rules = ["S102", "S105", "S106", "S107", "S301", "S302", "S307", "S501", "S506", "S602", "S605", "S608"]
+    for r in high_rules:
+        category, severity = classify_ruff_rule(r)
+        assert category == "security"
+        assert severity == "high", f"Rule {r} should remain HIGH severity"
+
+
+def test_ruff_severity_normalization_is_deterministic():
+    from app.analyzers.ruff import classify_ruff_rule
+    rules = ["S101", "S102", "S104", "F401", "F821", "B006", "E999", "E501", "UNKNOWN_CODE"]
+    for r in rules:
+        res1 = classify_ruff_rule(r)
+        res2 = classify_ruff_rule(r)
+        assert res1 == res2, f"Normalization of {r} is not deterministic"
+
+
+def test_ruff_unknown_rules_use_documented_safe_default():
+    from app.analyzers.ruff import classify_ruff_rule
+    # Unknown S rule defaults to medium security rather than high
+    s_cat, s_sev = classify_ruff_rule("S9999")
+    assert s_cat == "security"
+    assert s_sev == "medium"
+    assert s_sev != "high"
+
+    # Unknown generic rule defaults to low quality rather than high
+    gen_cat, gen_sev = classify_ruff_rule("CUSTOM_XYZ")
+    assert gen_cat == "quality"
+    assert gen_sev == "low"
+    assert gen_sev != "high"
 
 
 def test_bandit_adapter_normalization(tmp_path):

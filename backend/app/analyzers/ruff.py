@@ -18,6 +18,125 @@ def get_ruff_path() -> str:
     return "ruff"
 
 
+# Explicit flake8-bandit (S) rule classifications
+# Aligns with Bandit's standard severity ratings:
+# - S101 ('assert' used) is explicitly LOW severity (defensive constructs/test assertions)
+# - Injection, exec, eval, unsafe deserialization, hardcoded passwords remain HIGH
+# - Weak crypto, binding to 0.0.0.0, missing timeouts remain MEDIUM
+RUFF_BANDIT_SEVERITY: dict[str, tuple[str, str]] = {
+    # High-severity security vulnerabilities
+    "S102": ("security", "high"),      # exec_used
+    "S103": ("security", "high"),      # bad_file_permissions
+    "S105": ("security", "high"),      # hardcoded_password_string
+    "S106": ("security", "high"),      # hardcoded_password_funcarg
+    "S107": ("security", "high"),      # hardcoded_password_default
+    "S301": ("security", "high"),      # pickle
+    "S302": ("security", "high"),      # marshal
+    "S307": ("security", "high"),      # eval_used
+    "S308": ("security", "high"),      # mark_safe
+    "S501": ("security", "high"),      # request_with_no_cert_validation
+    "S506": ("security", "high"),      # unsafe_yaml_load
+    "S602": ("security", "high"),      # subprocess_popen_with_shell_equals_true
+    "S604": ("security", "high"),      # any_other_function_with_shell_equals_true
+    "S605": ("security", "high"),      # start_process_with_a_shell
+    "S608": ("security", "high"),      # hardcoded_sql_expressions
+    "S612": ("security", "high"),      # logging_config_listen
+
+    # Medium-severity security issues
+    "S104": ("security", "medium"),    # hardcoded_bind_all_interfaces (0.0.0.0)
+    "S108": ("security", "medium"),    # hardcoded_tmp_directory (/tmp)
+    "S113": ("security", "medium"),    # request_without_timeout
+    "S303": ("security", "medium"),    # md5_used
+    "S304": ("security", "medium"),    # insecure_cipher
+    "S305": ("security", "medium"),    # insecure_hash
+    "S306": ("security", "medium"),    # mktemp_q
+    "S310": ("security", "medium"),    # urllib_urlopen
+    "S313": ("security", "medium"),    # xml_bad_cdata
+    "S314": ("security", "medium"),    # xml_bad_element_tree
+    "S315": ("security", "medium"),    # xml_bad_expat_builder
+    "S316": ("security", "medium"),    # xml_bad_expat_reader
+    "S317": ("security", "medium"),    # xml_bad_sax
+    "S318": ("security", "medium"),    # xml_bad_minidom
+    "S319": ("security", "medium"),    # xml_bad_pulldom
+    "S320": ("security", "medium"),    # xml_bad_etree
+    "S324": ("security", "medium"),    # hashlib_insecure_hash_functions
+    "S601": ("security", "medium"),    # paramiko_call
+    "S609": ("security", "medium"),    # unix_wildcard_injection
+    "S610": ("security", "medium"),    # django_extra_used
+    "S611": ("security", "medium"),    # django_rawsql_used
+
+    # Low-severity security issues
+    # S101: In Python, assertions are standard defensive checks and test primitives.
+    # Bandit officially rates B101 as LOW severity. Codebase Doctor deterministically
+    # maps S101 to 'low' severity under 'security' to prevent score distortion.
+    "S101": ("security", "low"),       # assert_used
+    "S110": ("security", "low"),       # try_except_pass
+    "S112": ("security", "low"),       # try_except_continue
+    "S311": ("security", "low"),       # pseudo_random_generators
+    "S603": ("security", "low"),       # subprocess_without_shell_equals_true
+    "S606": ("security", "low"),       # start_process_with_no_shell
+    "S607": ("security", "low"),       # start_process_with_partial_path
+}
+
+
+def classify_ruff_rule(rule_code: str) -> tuple[str, str]:
+    """
+    Deterministically map Ruff rule codes to normalized (category, severity).
+    Valid categories: 'bug' | 'security' | 'dead_code' | 'dependency' | 'architecture' | 'quality'
+    Valid severities: 'critical' | 'high' | 'medium' | 'low' | 'info'
+    """
+    code_upper = rule_code.upper()
+
+    # 1. Flake8-Bandit security rules
+    if code_upper in RUFF_BANDIT_SEVERITY:
+        return RUFF_BANDIT_SEVERITY[code_upper]
+
+    if code_upper.startswith("S"):
+        # Unknown Bandit security rule: default to medium severity security
+        return ("security", "medium")
+
+    # 2. Dead code rules
+    if code_upper in {"F401", "F841"}:
+        return ("dead_code", "low")
+
+    # 3. Critical runtime bugs / syntax errors
+    if code_upper in {"F821", "F822", "F823", "F706"} or code_upper.startswith("E9"):
+        return ("bug", "high")
+
+    # 4. Pyflakes logic bugs
+    if code_upper.startswith("F6") or code_upper.startswith("F7"):
+        return ("bug", "high")
+    if code_upper.startswith("F8"):
+        return ("bug", "medium")
+    if code_upper.startswith("F"):
+        return ("quality", "medium")
+
+    # 5. Flake8-Bugbear rules
+    if code_upper.startswith("B"):
+        if code_upper in {"B006", "B015", "B023"}:
+            return ("bug", "medium")
+        if code_upper in {"B008", "B009", "B010", "B018", "B028", "B904"}:
+            return ("quality", "low")
+        return ("bug", "medium")
+
+    # 6. Async rules
+    if code_upper.startswith("ASYNC"):
+        return ("bug", "medium")
+
+    # 7. Bare except
+    if code_upper in {"E722", "B001"}:
+        return ("quality", "medium")
+
+    # 8. Style, formatting, comprehensions, perflint
+    if code_upper.startswith("E") or code_upper.startswith("W"):
+        return ("quality", "low")
+    if code_upper.startswith("C4") or code_upper.startswith("PERF"):
+        return ("quality", "low")
+
+    # 9. Documented safe default for any unknown Ruff rule
+    return ("quality", "low")
+
+
 class RuffAnalyzer(BaseAnalyzer):
     def run(self) -> list[FindingData]:
         findings: list[FindingData] = []
@@ -76,30 +195,16 @@ class RuffAnalyzer(BaseAnalyzer):
             end_line = item.get("end_location", {}).get("row", start_line)
             message = item.get("message", "Ruff issue detected")
 
-            # Category & Severity mapping
-            category = "quality"
-            severity = "low"
-
-            if rule_code.startswith("S"):  # Security
-                category = "security"
-                severity = "high"
-            elif rule_code in {"F401", "F841"}:  # Unused import/var
-                category = "dead_code"
-                severity = "low"
-            elif rule_code.startswith("B"):  # Bugbear
-                category = "bug"
-                severity = "medium"
-            elif rule_code.startswith("E9") or rule_code.startswith("F6") or rule_code.startswith("F7") or rule_code.startswith("F8"):
-                category = "bug"
-                severity = "high"
+            # Deterministic Category & Severity classification
+            category, severity = classify_ruff_rule(rule_code)
 
             snippet = extract_snippet(self.workspace_root, rel_file, start_line, end_line)
 
             findings.append(
                 FindingData(
                     analyzer="ruff",
-                    category=category,
-                    severity=severity,
+                    category=category,  # type: ignore
+                    severity=severity,  # type: ignore
                     rule_id=f"ruff:{rule_code}",
                     file_path=rel_file,
                     start_line=start_line,
