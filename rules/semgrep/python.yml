@@ -1,0 +1,100 @@
+rules:
+  - id: python-subprocess-shell-true
+    patterns:
+      - pattern: subprocess.$METHOD(..., shell=True, ...)
+    message: "Potential command injection risk: subprocess invoked with shell=True"
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+
+  - id: python-os-system-execution
+    patterns:
+      - pattern-either:
+          - pattern: os.system(...)
+          - pattern: os.popen(...)
+    message: "Dangerous command execution detected: os.system or os.popen should be replaced by subprocess with argument lists"
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-78: OS Command Injection"
+
+  - id: python-dangerous-eval-exec
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+    message: "Dynamic code execution via eval/exec detected on potentially untrusted input"
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+
+  - id: python-unsafe-pickle
+    patterns:
+      - pattern-either:
+          - pattern: pickle.load(...)
+          - pattern: pickle.loads(...)
+          - pattern: _pickle.load(...)
+          - pattern: _pickle.loads(...)
+    message: "Unsafe deserialization: pickle.load/loads allows arbitrary code execution"
+    languages: [python]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+
+  - id: python-unsafe-yaml-load
+    patterns:
+      - pattern: yaml.load($INPUT, ...)
+      - pattern-not: yaml.load($INPUT, Loader=yaml.SafeLoader)
+      - pattern-not: yaml.load($INPUT, Loader=SafeLoader)
+      - pattern-not: yaml.safe_load(...)
+    message: "Unsafe YAML deserialization: use yaml.safe_load or Loader=yaml.SafeLoader"
+    languages: [python]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+
+  - id: python-sql-injection-format
+    patterns:
+      - pattern-either:
+          - pattern: $CURSOR.execute(f"...", ...)
+          - pattern: $CURSOR.execute("..." % ..., ...)
+          - pattern: $CURSOR.execute("...".format(...), ...)
+    message: "Potential SQL injection: raw formatted string passed to database query"
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+
+  - id: python-insecure-cors-wildcard
+    patterns:
+      - pattern: |
+          CORSMiddleware(
+            ...,
+            allow_origins=["*"],
+            allow_credentials=True,
+            ...
+          )
+    message: "Insecure CORS configuration: wildcard origin with credentials allowed"
+    languages: [python]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-942: Permissive Cross-domain Policy with Untrusted Domains"
+
+  - id: python-path-traversal-open
+    patterns:
+      - pattern: open(os.path.join(..., $USER_INPUT, ...), ...)
+    message: "Potential path traversal: opening file with unvalidated path join"
+    languages: [python]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')"
