@@ -82,55 +82,142 @@ RUFF_BANDIT_SEVERITY: dict[str, tuple[str, str]] = {
 def classify_ruff_rule(rule_code: str) -> tuple[str, str]:
     """
     Deterministically map Ruff rule codes to normalized (category, severity).
-    Valid categories: 'bug' | 'security' | 'dead_code' | 'dependency' | 'architecture' | 'quality'
+    Valid categories: 'security' | 'dead_code' | 'architecture' | 'dependency' | 'bug' | 'quality'
     Valid severities: 'critical' | 'high' | 'medium' | 'low' | 'info'
     """
     code_upper = rule_code.upper()
 
-    # 1. Flake8-Bandit security rules
+    # 1. Flake8-Bandit Security rules (S followed by digits, e.g. S101, S105, S301)
     if code_upper in RUFF_BANDIT_SEVERITY:
         return RUFF_BANDIT_SEVERITY[code_upper]
 
-    if code_upper.startswith("S"):
-        # Unknown Bandit security rule: default to medium severity security
+    if code_upper.startswith("S") and len(code_upper) > 1 and code_upper[1].isdigit():
+        # Unknown Bandit security rule: safe default to medium severity security
         return ("security", "medium")
 
-    # 2. Dead code rules
-    if code_upper in {"F401", "F841"}:
+    # 2. Dead Code rules (unused imports, variables, arguments, comments, noqa)
+    if code_upper in {"F401", "F841", "F842", "B007", "RUF100"}:
+        return ("dead_code", "low")
+    if code_upper.startswith("ARG"):  # flake8-unused-arguments (ARG001-ARG005)
+        return ("dead_code", "low")
+    if code_upper.startswith("ERA"):  # eradicate commented-out code (ERA001)
         return ("dead_code", "low")
 
-    # 3. Critical runtime bugs / syntax errors
-    if code_upper in {"F821", "F822", "F823", "F706"} or code_upper.startswith("E9"):
+    # 3. Architecture & Import Boundaries
+    if code_upper.startswith("TID"):  # flake8-tidy-imports
+        if code_upper == "TID251":  # banned API
+            return ("architecture", "medium")
+        return ("architecture", "low")  # TID252 relative imports, TID253 banned module-level
+    if code_upper.startswith("TCH"):  # flake8-type-checking imports
+        return ("architecture", "low")
+    if code_upper.startswith("INP"):  # flake8-no-pep420 implicit namespace packages
+        return ("architecture", "low")
+    if code_upper.startswith("ICN"):  # flake8-import-conventions
+        return ("architecture", "low")
+
+    # 4. Dependency rules
+    if code_upper.startswith("DEP"):  # dependency specifications
+        return ("dependency", "low")
+    if code_upper.startswith("EXE"):  # flake8-executable (shebang & permissions)
+        return ("dependency", "low")
+
+    # 5. Bug - High Severity (Syntax errors, runtime crashes, undefined symbols)
+    if code_upper in {"F821", "F822", "F823", "F706", "F701", "F702", "F704", "F707", "F621", "F622", "F831"}:
+        return ("bug", "high")
+    if code_upper.startswith("E9"):  # SyntaxError, IndentationError, IOError
+        return ("bug", "high")
+    if code_upper.startswith("F7"):  # Syntax errors in control flow
+        return ("bug", "high")
+    if code_upper.startswith("PLE"):  # Pylint error codes
         return ("bug", "high")
 
-    # 4. Pyflakes logic bugs
-    if code_upper.startswith("F6") or code_upper.startswith("F7"):
-        return ("bug", "high")
-    if code_upper.startswith("F8"):
+    # 6. Bug - Medium Severity (Logic bugs, race conditions, async hazards, bugbear)
+    if code_upper.startswith("F6"):  # duplicate dict keys, assert tuple
         return ("bug", "medium")
-    if code_upper.startswith("F"):
-        return ("quality", "medium")
-
-    # 5. Flake8-Bugbear rules
+    if code_upper.startswith("F8"):  # redefinition of unused name, other logic errors
+        return ("bug", "medium")
+    if code_upper.startswith("ASYNC"):  # flake8-async hazards
+        return ("bug", "medium")
+    if code_upper.startswith("PLW"):  # Pylint warnings
+        return ("bug", "medium")
     if code_upper.startswith("B"):
-        if code_upper in {"B006", "B015", "B023"}:
+        # Flake8-Bugbear bug rules
+        if code_upper in {"B006", "B015", "B017", "B023", "B026", "B002", "B003", "B004", "B005", "B012", "B016", "B020"}:
             return ("bug", "medium")
-        if code_upper in {"B008", "B009", "B010", "B018", "B028", "B904"}:
+        if code_upper == "B021":  # f-string docstring
+            return ("bug", "low")
+        if code_upper in {"B008", "B009", "B010", "B018", "B024", "B027", "B028", "B904", "B905"}:
             return ("quality", "low")
+        if code_upper == "B001":  # bare except
+            return ("quality", "medium")
         return ("bug", "medium")
 
-    # 6. Async rules
-    if code_upper.startswith("ASYNC"):
-        return ("bug", "medium")
-
-    # 7. Bare except
-    if code_upper in {"E722", "B001"}:
+    # 7. Quality - Medium Severity (bare/blind exception handling, complexity)
+    if code_upper in {"E722", "BLE001"}:
+        return ("quality", "medium")
+    if code_upper.startswith("C9"):  # mccabe complexity (C901)
         return ("quality", "medium")
 
-    # 8. Style, formatting, comprehensions, perflint
-    if code_upper.startswith("E") or code_upper.startswith("W"):
+    # 8. Quality - Low Severity (formatting, lint, style, conventions, refactoring)
+    if code_upper.startswith("E") or code_upper.startswith("W"):  # pycodestyle
         return ("quality", "low")
-    if code_upper.startswith("C4") or code_upper.startswith("PERF"):
+    if code_upper.startswith("N"):  # pep8-naming (N801-N818)
+        return ("quality", "low")
+    if code_upper.startswith("D") or code_upper.startswith("DOC"):  # pydocstyle
+        return ("quality", "low")
+    if code_upper.startswith("UP"):  # pyupgrade (UP001-UP043)
+        return ("quality", "low")
+    if code_upper.startswith("I"):  # isort (I001, I002)
+        return ("quality", "low")
+    if code_upper.startswith("C4"):  # flake8-comprehensions
+        return ("quality", "low")
+    if code_upper.startswith("SIM"):  # flake8-simplify
+        return ("quality", "low")
+    if code_upper.startswith("PIE"):  # flake8-pie
+        return ("quality", "low")
+    if code_upper.startswith("RET"):  # flake8-return
+        return ("quality", "low")
+    if code_upper.startswith("RSE"):  # flake8-raise
+        return ("quality", "low")
+    if code_upper.startswith("SLF"):  # flake8-self
+        return ("quality", "low")
+    if code_upper.startswith("PTH"):  # flake8-use-pathlib
+        return ("quality", "low")
+    if code_upper.startswith("T20"):  # flake8-print
+        return ("quality", "low")
+    if code_upper.startswith("Q"):  # flake8-quotes
+        return ("quality", "low")
+    if code_upper.startswith("COM"):  # flake8-commas
+        return ("quality", "low")
+    if code_upper.startswith("DTZ"):  # flake8-datetimez
+        return ("quality", "low")
+    if code_upper.startswith("EM"):  # flake8-errmsg
+        return ("quality", "low")
+    if code_upper.startswith("ISC"):  # flake8-implicit-str-concat
+        return ("quality", "low")
+    if code_upper.startswith("G") or code_upper.startswith("LOG"):  # logging format
+        return ("quality", "low")
+    if code_upper.startswith("PGH"):  # pygrep-hooks
+        return ("quality", "low")
+    if code_upper.startswith("PLR") or code_upper.startswith("PLC"):  # Pylint refactor / convention
+        return ("quality", "low")
+    if code_upper.startswith("TRY"):  # tryceratops
+        return ("quality", "low")
+    if code_upper.startswith("FLY"):  # flynt
+        return ("quality", "low")
+    if code_upper.startswith("PERF"):  # perflint
+        return ("quality", "low")
+    if code_upper.startswith("FURB"):  # refurb
+        return ("quality", "low")
+    if code_upper.startswith("ANN"):  # flake8-annotations
+        return ("quality", "low")
+    if code_upper.startswith("FBT"):  # flake8-boolean-trap
+        return ("quality", "low")
+    if code_upper.startswith("PT"):  # flake8-pytest-style
+        return ("quality", "low")
+    if code_upper.startswith("RUF"):  # Ruff-specific rules (except RUF100)
+        return ("quality", "low")
+    if code_upper.startswith("F"):  # remaining Pyflakes
         return ("quality", "low")
 
     # 9. Documented safe default for any unknown Ruff rule

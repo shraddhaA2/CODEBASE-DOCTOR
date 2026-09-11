@@ -96,6 +96,59 @@ def test_ruff_unknown_rules_use_documented_safe_default():
     assert gen_sev != "high"
 
 
+def test_ruff_categories_across_all_rule_families():
+    from app.analyzers.ruff import classify_ruff_rule
+
+    # 1. Security rules
+    sec_rules = {
+        "S101": ("security", "low"),
+        "S102": ("security", "high"),
+        "S105": ("security", "high"),
+        "S301": ("security", "high"),
+        "S113": ("security", "medium"),
+    }
+    for code, (expected_cat, expected_sev) in sec_rules.items():
+        cat, sev = classify_ruff_rule(code)
+        assert cat == expected_cat, f"Rule {code} should be {expected_cat}, got {cat}"
+        assert sev == expected_sev, f"Rule {code} should be {expected_sev}, got {sev}"
+
+    # 2. Quality rules
+    quality_rules = ["E501", "W291", "N802", "D100", "C901", "C408", "SIM101", "UP006", "B008", "B904"]
+    for code in quality_rules:
+        cat, sev = classify_ruff_rule(code)
+        assert cat == "quality", f"Rule {code} should be quality, got {cat}"
+
+    # 3. Bug-related rules
+    bug_rules = ["F821", "F822", "E999", "F706", "B006", "B017", "ASYNC100", "PLE0100"]
+    for code in bug_rules:
+        cat, sev = classify_ruff_rule(code)
+        assert cat == "bug", f"Rule {code} should be bug, got {cat}"
+
+    # 4. Dead-code rules
+    dead_code_rules = ["F401", "F841", "ARG001", "ERA001", "RUF100", "B007"]
+    for code in dead_code_rules:
+        cat, sev = classify_ruff_rule(code)
+        assert cat == "dead_code", f"Rule {code} should be dead_code, got {cat}"
+
+    # 5. Architecture rules
+    arch_rules = ["TID251", "TID252", "TCH001", "INP001", "ICN001"]
+    for code in arch_rules:
+        cat, sev = classify_ruff_rule(code)
+        assert cat == "architecture", f"Rule {code} should be architecture, got {cat}"
+
+    # 6. Dependency rules
+    dep_rules = ["EXE001", "DEP001"]
+    for code in dep_rules:
+        cat, sev = classify_ruff_rule(code)
+        assert cat == "dependency", f"Rule {code} should be dependency, got {cat}"
+
+    # 7. Safe default unknown rules
+    cat_unk, sev_unk = classify_ruff_rule("NON_EXISTENT_RULE_XYZ")
+    assert cat_unk == "quality"
+    assert sev_unk == "low"
+
+
+
 def test_bandit_adapter_normalization(tmp_path):
     (tmp_path / "test.py").write_text("import subprocess\n", encoding="utf-8")
 
