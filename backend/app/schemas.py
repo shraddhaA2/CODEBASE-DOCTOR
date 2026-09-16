@@ -37,6 +37,10 @@ class FindingResponse(BaseModel):
     message: str
     evidence: dict[str, Any] | None = None
     redacted_snippet: str | None = None
+    scope: Literal["source", "test", "generated", "vendor", "docs"] = "source"
+    is_duplicate: bool = False
+    primary_finding_id: str | None = None
+    canonical_rule_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

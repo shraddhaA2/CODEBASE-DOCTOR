@@ -94,7 +94,7 @@ Every repository receives an auditable health score starting at **100.0** across
 | **Performance** | `10%` | Static performance rules (neutral 100 if no static findings detected) |
 
 ### Penalty Deductions
-- **Critical Finding**: `-15` points
+- **Critical Finding**: `-20` points
 - **High Severity**: `-8` points
 - **Medium Severity**: `-3` points
 - **Low Severity**: `-1` points

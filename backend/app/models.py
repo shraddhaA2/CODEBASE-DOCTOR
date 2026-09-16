@@ -5,6 +5,7 @@ from sqlalchemy import (
     String,
     Integer,
     Float,
+    Boolean,
     Text,
     DateTime,
     ForeignKey,
@@ -54,6 +55,10 @@ class Finding(Base):
     message = Column(Text, nullable=False)
     evidence = Column(JSON, nullable=True)
     redacted_snippet = Column(Text, nullable=True)
+    scope = Column(String(32), default="source", nullable=False, index=True)
+    is_duplicate = Column(Boolean, default=False, nullable=False, index=True)
+    primary_finding_id = Column(String(36), nullable=True, index=True)
+    canonical_rule_id = Column(String(128), nullable=True, index=True)
 
     scan = relationship("Scan", back_populates="findings")
 

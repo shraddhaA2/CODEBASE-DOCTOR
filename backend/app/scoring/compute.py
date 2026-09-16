@@ -37,6 +37,10 @@ class ScoreCalculator:
 
         # Process finding penalties
         for f in findings:
+            # Ignore duplicate findings from secondary analyzers
+            if getattr(f, "is_duplicate", False):
+                continue
+
             dim = CATEGORY_TO_DIMENSION.get(f.category, "code_quality")
             penalty_val = SEVERITY_PENALTIES.get(f.severity.lower(), 0.0)
 

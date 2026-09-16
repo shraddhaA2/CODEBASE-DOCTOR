@@ -111,6 +111,21 @@ export const Dashboard: React.FC = () => {
     categoryCounts[f.category] = (categoryCounts[f.category] || 0) + 1;
   });
 
+  // Calculate scope counts and duplicates
+  const scopeCounts: Record<string, number> = {
+    source: 0,
+    test: 0,
+    docs: 0,
+    generated: 0,
+    vendor: 0,
+  };
+  let duplicateCount = 0;
+  findings.forEach((f) => {
+    const sc = f.scope || 'source';
+    scopeCounts[sc] = (scopeCounts[sc] || 0) + 1;
+    if (f.is_duplicate) duplicateCount += 1;
+  });
+
   const dimensionChartData = [
     { name: 'Security', score: score.security, weight: '25%' },
     { name: 'Architecture', score: score.architecture, weight: '15%' },
@@ -288,6 +303,39 @@ export const Dashboard: React.FC = () => {
                     <div className="text-[10px] text-slate-500 uppercase mt-0.5">findings</div>
                   </div>
                 ))}
+              </div>
+
+              {/* Findings by Scope */}
+              <div className="mt-4 pt-3 border-t border-[#21262d] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
+                  <span className="text-slate-400 font-semibold uppercase text-[11px]">Scope:</span>
+                  <span className="px-2 py-0.5 rounded bg-[#0d1117] border border-blue-900/40 text-blue-300">
+                    Source: <strong className="text-white">{scopeCounts.source}</strong>
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#0d1117] border border-purple-900/40 text-purple-300">
+                    Test: <strong className="text-white">{scopeCounts.test}</strong>
+                  </span>
+                  {scopeCounts.docs > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-[#0d1117] border border-amber-900/40 text-amber-300">
+                      Docs: <strong className="text-white">{scopeCounts.docs}</strong>
+                    </span>
+                  )}
+                  {scopeCounts.generated > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-[#0d1117] border border-[#21262d] text-slate-300">
+                      Generated: <strong className="text-white">{scopeCounts.generated}</strong>
+                    </span>
+                  )}
+                  {scopeCounts.vendor > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-[#0d1117] border border-[#21262d] text-slate-300">
+                      Vendor: <strong className="text-white">{scopeCounts.vendor}</strong>
+                    </span>
+                  )}
+                </div>
+                {duplicateCount > 0 && (
+                  <span className="text-[10px] font-mono text-amber-400/90 bg-amber-950/30 px-2 py-0.5 rounded border border-amber-800/30 shrink-0">
+                    {duplicateCount} cross-tool duplicate findings deduplicated
+                  </span>
+                )}
               </div>
             </div>
 

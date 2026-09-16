@@ -19,6 +19,10 @@ class FindingData:
     end_line: int | None = None
     evidence: dict[str, Any] = field(default_factory=dict)
     redacted_snippet: str | None = None
+    scope: Literal["source", "test", "generated", "vendor", "docs"] = "source"
+    is_duplicate: bool = False
+    primary_finding_id: str | None = None
+    canonical_rule_id: str | None = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,6 +38,10 @@ class FindingData:
             "message": redact_text(self.message) or self.message,
             "evidence": redact_dict(self.evidence),
             "redacted_snippet": redact_text(self.redacted_snippet),
+            "scope": self.scope,
+            "is_duplicate": self.is_duplicate,
+            "primary_finding_id": self.primary_finding_id,
+            "canonical_rule_id": self.canonical_rule_id or self.rule_id,
         }
 
 

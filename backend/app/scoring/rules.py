@@ -2,7 +2,7 @@ from typing import Literal
 
 # Severity penalties per specification
 SEVERITY_PENALTIES: dict[str, float] = {
-    "critical": 15.0,
+    "critical": 20.0,
     "high": 8.0,
     "medium": 3.0,
     "low": 1.0,

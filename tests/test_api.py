@@ -117,3 +117,137 @@ def test_get_scan_and_findings(client):
     assert data["security"] == 92.0
     assert data["overall"] == 98.0
     assert "breakdown" in data
+
+
+def test_get_findings_scope_filtering(client):
+    db = SessionLocal()
+    scan = Scan(
+        github_url="https://github.com/octocat/Scope-Test",
+        status="succeeded",
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    f_source = Finding(
+        scan_id=scan.id,
+        analyzer="bandit",
+        category="security",
+        severity="low",
+        rule_id="bandit:B101",
+        file_path="src/requests/api.py",
+        start_line=10,
+        message="assert used",
+        scope="source",
+    )
+    f_test = Finding(
+        scan_id=scan.id,
+        analyzer="bandit",
+        category="security",
+        severity="low",
+        rule_id="bandit:B101",
+        file_path="tests/test_api.py",
+        start_line=20,
+        message="assert used in test",
+        scope="test",
+    )
+    f_docs = Finding(
+        scan_id=scan.id,
+        analyzer="ruff",
+        category="quality",
+        severity="low",
+        rule_id="ruff:E501",
+        file_path="docs/index.rst",
+        start_line=5,
+        message="line too long",
+        scope="docs",
+    )
+    db.add_all([f_source, f_test, f_docs])
+    db.commit()
+    scan_id = scan.id
+    db.close()
+
+    # Scope filtering: test
+    res = client.get(f"/api/scans/{scan_id}/findings?scope=test")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) == 1
+    assert data[0]["file_path"] == "tests/test_api.py"
+    assert data[0]["scope"] == "test"
+
+    # Scope filtering: source
+    res = client.get(f"/api/scans/{scan_id}/findings?scope=source")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) == 1
+    assert data[0]["file_path"] == "src/requests/api.py"
+    assert data[0]["scope"] == "source"
+
+    # Scope filtering: docs
+    res = client.get(f"/api/scans/{scan_id}/findings?scope=docs")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) == 1
+    assert data[0]["file_path"] == "docs/index.rst"
+
+
+def test_get_findings_include_duplicates(client):
+    db = SessionLocal()
+    scan = Scan(
+        github_url="https://github.com/octocat/Dedup-Test",
+        status="succeeded",
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    primary = Finding(
+        scan_id=scan.id,
+        analyzer="bandit",
+        category="security",
+        severity="low",
+        rule_id="bandit:B101",
+        file_path="tests/test_requests.py",
+        start_line=15,
+        message="assert used",
+        scope="test",
+        is_duplicate=False,
+        canonical_rule_id="bandit:B101",
+    )
+    db.add(primary)
+    db.commit()
+    db.refresh(primary)
+
+    duplicate = Finding(
+        scan_id=scan.id,
+        analyzer="ruff",
+        category="security",
+        severity="low",
+        rule_id="ruff:S101",
+        file_path="tests/test_requests.py",
+        start_line=15,
+        message="assert detected",
+        scope="test",
+        is_duplicate=True,
+        primary_finding_id=primary.id,
+        canonical_rule_id="bandit:B101",
+    )
+    db.add(duplicate)
+    db.commit()
+    scan_id = scan.id
+    db.close()
+
+    # Default include_duplicates=true returns both
+    res = client.get(f"/api/scans/{scan_id}/findings")
+    assert res.status_code == 200
+    assert len(res.json()) == 2
+
+    # include_duplicates=false returns only primary
+    res = client.get(f"/api/scans/{scan_id}/findings?include_duplicates=false")
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) == 1
+    assert data[0]["is_duplicate"] is False
+    assert data[0]["rule_id"] == "bandit:B101"
+    assert data[0]["canonical_rule_id"] == "bandit:B101"
+

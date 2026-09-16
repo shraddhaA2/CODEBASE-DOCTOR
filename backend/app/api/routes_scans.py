@@ -64,6 +64,8 @@ def get_findings(
     category: str | None = Query(None, description="Filter by category"),
     severity: str | None = Query(None, description="Filter by severity"),
     analyzer: str | None = Query(None, description="Filter by analyzer"),
+    scope: str | None = Query(None, description="Filter by scope: source, test, generated, vendor, docs"),
+    include_duplicates: bool = Query(True, description="Whether to include duplicate findings from secondary analyzers"),
     db: Session = Depends(get_db),
 ):
     """Retrieve findings for a scan with optional filters."""
@@ -78,6 +80,10 @@ def get_findings(
         query = query.filter(Finding.severity == severity)
     if analyzer:
         query = query.filter(Finding.analyzer == analyzer)
+    if scope:
+        query = query.filter(Finding.scope == scope)
+    if not include_duplicates:
+        query = query.filter(Finding.is_duplicate.is_(False))
 
     findings = query.all()
     return findings

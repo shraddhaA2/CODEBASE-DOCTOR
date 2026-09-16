@@ -30,6 +30,7 @@ export interface Scan {
 
 export type FindingCategory = 'bug' | 'security' | 'dead_code' | 'dependency' | 'architecture' | 'quality';
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+export type FindingScope = 'source' | 'test' | 'generated' | 'vendor' | 'docs';
 
 export interface Finding {
   id: string;
@@ -44,6 +45,10 @@ export interface Finding {
   message: string;
   evidence: Record<string, any> | null;
   redacted_snippet: string | null;
+  scope?: FindingScope;
+  is_duplicate?: boolean;
+  primary_finding_id?: string | null;
+  canonical_rule_id?: string | null;
 }
 
 export interface ArchitectureMetric {

@@ -71,12 +71,14 @@ export const api = {
   /** Get filtered findings for a scan */
   async getFindings(
     scanId: string,
-    filters?: { category?: string; severity?: string; analyzer?: string }
+    filters?: { category?: string; severity?: string; analyzer?: string; scope?: string; include_duplicates?: boolean }
   ): Promise<Finding[]> {
     const params = new URLSearchParams();
     if (filters?.category) params.append('category', filters.category);
     if (filters?.severity) params.append('severity', filters.severity);
     if (filters?.analyzer) params.append('analyzer', filters.analyzer);
+    if (filters?.scope) params.append('scope', filters.scope);
+    if (filters?.include_duplicates !== undefined) params.append('include_duplicates', String(filters.include_duplicates));
     const qs = params.toString();
     return request<Finding[]>(`/api/scans/${scanId}/findings${qs ? `?${qs}` : ''}`);
   },

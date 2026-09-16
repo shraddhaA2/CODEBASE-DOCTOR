@@ -11,6 +11,8 @@ from app.analyzers.semgrep import SemgrepAnalyzer
 from app.analyzers.dependencies import DependencyAnalyzer
 from app.analyzers.architecture import ArchitectureAnalyzer
 from app.analyzers.heuristics import HeuristicsAnalyzer
+from app.pipeline.scope import classify_file_scope
+from app.pipeline.deduplication import deduplicate_findings
 from app.scoring.compute import ScoreCalculator
 
 logger = logging.getLogger("codebase_doctor.orchestrator")
@@ -107,9 +109,15 @@ def _execute_scan_sync(scan_id: str) -> None:
             logger.error(f"Heuristics error on scan {scan_id}: {e}")
             all_findings.append(HeuristicsAnalyzer(workspace_dir).create_error_finding(str(e)))
 
-        # 4. Deduplicate and persist Findings
-        seen_keys = set()
+        # 4. Scope assignment and Cross-Analyzer Deduplication
         for f in all_findings:
+            f.scope = classify_file_scope(f.file_path)
+
+        processed_findings = deduplicate_findings(all_findings)
+
+        # Persist ALL findings to SQLite preserving complete analyzer provenance
+        seen_keys = set()
+        for f in processed_findings:
             dedup_key = (f.analyzer, f.rule_id, f.file_path, f.start_line)
             if dedup_key in seen_keys:
                 continue
@@ -128,6 +136,10 @@ def _execute_scan_sync(scan_id: str) -> None:
                 message=f.message,
                 evidence=f.evidence,
                 redacted_snippet=f.redacted_snippet,
+                scope=f.scope,
+                is_duplicate=f.is_duplicate,
+                primary_finding_id=f.primary_finding_id,
+                canonical_rule_id=f.canonical_rule_id or f.rule_id,
             )
             db.add(finding_record)
 
@@ -142,8 +154,9 @@ def _execute_scan_sync(scan_id: str) -> None:
             )
             db.add(arch_record)
 
-        # 6. Compute & Persist Health Scores
-        scores, breakdown = ScoreCalculator.calculate(all_findings, arch_metrics)
+        # 6. Compute & Persist Health Scores (Score ONLY primary/unique findings)
+        scoring_findings = [f for f in processed_findings if not f.is_duplicate]
+        scores, breakdown = ScoreCalculator.calculate(scoring_findings, arch_metrics)
         health_record = HealthScore(
             scan_id=scan_id,
             security=scores["security"],

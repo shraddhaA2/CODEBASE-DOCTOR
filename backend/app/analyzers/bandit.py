@@ -73,6 +73,8 @@ class BanditAnalyzer(BaseAnalyzer):
                 rel_file = str(Path(raw_file).relative_to(self.workspace_root)).replace("\\", "/")
             except ValueError:
                 rel_file = raw_file.replace("\\", "/")
+            while rel_file.startswith("./"):
+                rel_file = rel_file[2:]
 
             start_line = item.get("line_number")
             line_range = item.get("line_range", [start_line])

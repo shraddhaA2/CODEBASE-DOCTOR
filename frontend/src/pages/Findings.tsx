@@ -13,6 +13,7 @@ import {
   Wrench,
   CheckCircle2,
   AlertTriangle,
+  Info,
 } from 'lucide-react';
 
 export const Findings: React.FC = () => {
@@ -26,13 +27,15 @@ export const Findings: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('');
   const [selectedAnalyzer, setSelectedAnalyzer] = useState<string>('');
+  const [selectedScope, setSelectedScope] = useState<string>('');
+  const [includeDuplicates, setIncludeDuplicates] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     loadData();
-  }, [id, selectedCategory, selectedSeverity, selectedAnalyzer]);
+  }, [id, selectedCategory, selectedSeverity, selectedAnalyzer, selectedScope, includeDuplicates]);
 
   const loadData = async () => {
     setLoading(true);
@@ -43,6 +46,8 @@ export const Findings: React.FC = () => {
           category: selectedCategory || undefined,
           severity: selectedSeverity || undefined,
           analyzer: selectedAnalyzer || undefined,
+          scope: selectedScope || undefined,
+          include_duplicates: includeDuplicates,
         }),
       ]);
       setScan(scanData);
@@ -91,7 +96,7 @@ export const Findings: React.FC = () => {
 
         {/* Filter Controls Bar */}
         <div className="bg-[#161b22] border border-[#21262d] rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
             {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
@@ -99,9 +104,25 @@ export const Findings: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search message, file, or rule..."
+                placeholder="Search message, file, rule..."
                 className="w-full pl-9 pr-3 py-1.5 bg-[#0d1117] border border-[#30363d] rounded-lg text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-blue-500"
               />
+            </div>
+
+            {/* Scope Filter */}
+            <div>
+              <select
+                value={selectedScope}
+                onChange={(e) => setSelectedScope(e.target.value)}
+                className="w-full px-3 py-1.5 bg-[#0d1117] border border-[#30363d] rounded-lg text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+              >
+                <option value="">All Scopes</option>
+                <option value="source">Source (Production)</option>
+                <option value="test">Test</option>
+                <option value="docs">Docs</option>
+                <option value="generated">Generated</option>
+                <option value="vendor">Vendor</option>
+              </select>
             </div>
 
             {/* Category Filter */}
@@ -154,6 +175,18 @@ export const Findings: React.FC = () => {
               </select>
             </div>
           </div>
+
+          <div className="flex items-center justify-between pt-1 border-t border-[#21262d]/60 text-xs font-mono text-slate-400">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeDuplicates}
+                onChange={(e) => setIncludeDuplicates(e.target.checked)}
+                className="rounded border-[#30363d] bg-[#0d1117] text-blue-500 focus:ring-0"
+              />
+              <span>Include cross-analyzer duplicate findings (retained for provenance)</span>
+            </label>
+          </div>
         </div>
 
         {/* Findings List */}
@@ -195,6 +228,21 @@ export const Findings: React.FC = () => {
                           <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#21262d] text-slate-300 border border-[#30363d]">
                             {finding.analyzer}
                           </span>
+                          {finding.scope && (
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-semibold border ${
+                              finding.scope === 'source' ? 'bg-blue-950/40 text-blue-300 border-blue-800/40' :
+                              finding.scope === 'test' ? 'bg-purple-950/40 text-purple-300 border-purple-800/40' :
+                              finding.scope === 'docs' ? 'bg-amber-950/40 text-amber-300 border-amber-800/40' :
+                              'bg-slate-800/60 text-slate-300 border-slate-700'
+                            }`}>
+                              {finding.scope}
+                            </span>
+                          )}
+                          {finding.is_duplicate && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50" title="Cross-analyzer duplicate (retained for provenance, not scored)">
+                              Duplicate
+                            </span>
+                          )}
                           <span className="text-[11px] font-mono text-slate-400">
                             {finding.rule_id}
                           </span>
@@ -220,6 +268,14 @@ export const Findings: React.FC = () => {
                   {/* Expanded Detail View */}
                   {isExpanded && (
                     <div className="px-6 pb-5 pt-1 bg-[#0d1117]/60 space-y-3">
+                      {finding.is_duplicate && (
+                        <div className="p-2.5 bg-amber-950/30 border border-amber-800/40 rounded-lg text-xs text-amber-300 font-mono flex items-center gap-2">
+                          <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>
+                            Cross-analyzer duplicate: Equivalent to canonical primary finding (ID: <span className="text-white">{finding.primary_finding_id?.slice(0, 8)}...</span>). Retained for audit provenance; not penalized in health score.
+                          </span>
+                        </div>
+                      )}
                       {/* Code Snippet Viewer */}
                       {finding.redacted_snippet ? (
                         <div>
