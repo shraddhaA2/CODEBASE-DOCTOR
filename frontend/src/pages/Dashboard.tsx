@@ -158,8 +158,12 @@ export const Dashboard: React.FC = () => {
       color: 'text-blue-400',
       description:
         score.breakdown.performance?.status === 'neutral'
-          ? 'Neutral (no static performance findings)'
+          ? 'No static performance issues detected'
           : 'Static performance rules',
+      supportingText:
+        score.breakdown.performance?.status === 'neutral'
+          ? 'No performance rules triggered. This does not constitute runtime performance testing.'
+          : 'This does not constitute runtime performance testing.',
     },
     {
       name: 'Code Quality',
@@ -324,28 +328,35 @@ export const Dashboard: React.FC = () => {
               return (
                 <div
                   key={dim.name}
-                  className="bg-[#161b22] border border-[#21262d] rounded-xl p-5 hover:border-[#30363d] transition-colors"
+                  className="bg-[#161b22] border border-[#21262d] rounded-xl p-5 hover:border-[#30363d] transition-colors flex flex-col justify-between"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`p-2 rounded-lg bg-[#0d1117] border border-[#21262d] ${dim.color}`}>
-                        <Icon className="w-4 h-4" />
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-2 rounded-lg bg-[#0d1117] border border-[#21262d] ${dim.color}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white">{dim.name}</h3>
+                          <span className="text-[11px] font-mono text-slate-500">Weight: {dim.weight}</span>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-white">{dim.name}</h3>
-                        <span className="text-[11px] font-mono text-slate-500">Weight: {dim.weight}</span>
+
+                      <div className="text-right">
+                        <span className="text-xl font-bold font-mono text-white">{dim.score}</span>
+                        <span className="text-xs text-slate-500 font-mono">/100</span>
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <span className="text-xl font-bold font-mono text-white">{dim.score}</span>
-                      <span className="text-xs text-slate-500 font-mono">/100</span>
-                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">{dim.description}</p>
+                    {dim.supportingText && (
+                      <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed italic">
+                        {dim.supportingText}
+                      </p>
+                    )}
                   </div>
 
-                  <p className="text-xs text-slate-400 leading-relaxed min-h-[32px]">{dim.description}</p>
-
-                  <div className="mt-3 w-full bg-[#0d1117] h-1.5 rounded-full overflow-hidden">
+                  <div className="mt-4 w-full bg-[#0d1117] h-1.5 rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all duration-500 ${
                         dim.score >= 80 ? 'bg-emerald-500' : dim.score >= 60 ? 'bg-amber-500' : 'bg-red-500'

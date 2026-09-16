@@ -17,7 +17,7 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
 
   // Determine color theme
   let color = '#ef4444'; // red
-  let statusText = 'Critical Risks Detected';
+  let statusText = 'Health Requires Attention';
   let badgeBg = 'bg-red-950/40 text-red-400 border-red-800/50';
 
   if (rounded >= 85) {
