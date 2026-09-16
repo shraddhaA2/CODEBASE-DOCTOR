@@ -6,6 +6,9 @@ from app.analyzers.base import BaseAnalyzer, FindingData, extract_snippet
 
 
 class ArchitectureAnalyzer(BaseAnalyzer):
+    default_category = "architecture"
+    analyzer_name = "architecture"
+
     def __init__(self, workspace_root: Path):
         super().__init__(workspace_root)
         self.metrics_data: list[dict[str, Any]] = []

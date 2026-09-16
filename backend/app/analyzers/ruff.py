@@ -225,6 +225,9 @@ def classify_ruff_rule(rule_code: str) -> tuple[str, str]:
 
 
 class RuffAnalyzer(BaseAnalyzer):
+    default_category = "quality"
+    analyzer_name = "ruff"
+
     def run(self) -> list[FindingData]:
         findings: list[FindingData] = []
         ruff_exe = get_ruff_path()

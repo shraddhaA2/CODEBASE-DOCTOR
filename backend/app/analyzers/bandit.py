@@ -7,6 +7,9 @@ from app.config import settings
 
 
 class BanditAnalyzer(BaseAnalyzer):
+    default_category = "security"
+    analyzer_name = "bandit"
+
     def run(self) -> list[FindingData]:
         findings: list[FindingData] = []
 

@@ -4,6 +4,9 @@ from app.analyzers.base import BaseAnalyzer, FindingData, extract_snippet
 
 
 class HeuristicsAnalyzer(BaseAnalyzer):
+    default_category = "quality"
+    analyzer_name = "heuristics"
+
     def run(self) -> list[FindingData]:
         findings: list[FindingData] = []
 

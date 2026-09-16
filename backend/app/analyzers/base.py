@@ -81,6 +81,9 @@ def extract_snippet(
 
 
 class BaseAnalyzer(ABC):
+    default_category: Literal["bug", "security", "dead_code", "dependency", "architecture", "quality"] = "quality"
+    analyzer_name: str = ""
+
     def __init__(self, workspace_root: Path):
         self.workspace_root = workspace_root.resolve()
 
@@ -89,11 +92,23 @@ class BaseAnalyzer(ABC):
         """Execute analyzer and return list of normalized findings."""
         pass
 
-    def create_error_finding(self, message: str, details: dict[str, Any] | None = None) -> FindingData:
+    def get_analyzer_name(self) -> str:
+        if self.analyzer_name:
+            return self.analyzer_name
+        name = self.__class__.__name__.lower().replace("analyzer", "")
+        return "dependencies" if name == "dependency" else name
+
+    def create_error_finding(
+        self,
+        message: str,
+        details: dict[str, Any] | None = None,
+        category: Literal["bug", "security", "dead_code", "dependency", "architecture", "quality"] | None = None,
+    ) -> FindingData:
         """Helper to create fail-soft analyzer_error finding."""
+        err_category = category or getattr(self, "default_category", "quality")
         return FindingData(
-            analyzer=self.__class__.__name__.lower().replace("analyzer", ""),
-            category="quality",
+            analyzer=self.get_analyzer_name(),
+            category=err_category,
             severity="medium",
             rule_id="ANALYZER_ERROR",
             file_path=".",

@@ -19,6 +19,9 @@ def get_semgrep_path() -> str:
 
 
 class SemgrepAnalyzer(BaseAnalyzer):
+    default_category = "security"
+    analyzer_name = "semgrep"
+
     def run(self) -> list[FindingData]:
         findings: list[FindingData] = []
 

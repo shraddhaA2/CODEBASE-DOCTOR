@@ -7,6 +7,8 @@ from app.analyzers.ruff import RuffAnalyzer
 from app.analyzers.bandit import BanditAnalyzer
 from app.analyzers.semgrep import SemgrepAnalyzer
 from app.analyzers.dependencies import DependencyAnalyzer
+from app.analyzers.architecture import ArchitectureAnalyzer
+from app.analyzers.heuristics import HeuristicsAnalyzer
 
 
 def test_ruff_adapter_normalization(tmp_path):
@@ -249,3 +251,32 @@ def test_dependency_adapter_pip_audit(tmp_path):
     assert f.category == "dependency"
     assert f.severity == "high"
     assert "CVE-2018-18074" in f.rule_id
+
+
+def test_dependency_analyzer_error_categorization(tmp_path):
+    from app.scoring.compute import ScoreCalculator
+
+    analyzer = DependencyAnalyzer(tmp_path)
+    finding = analyzer.create_error_finding("pip-audit timed out on docs/requirements.txt")
+    assert finding.analyzer == "dependencies"
+    assert finding.category == "dependency"
+    assert finding.severity == "medium"
+    assert finding.rule_id == "ANALYZER_ERROR"
+
+    # Regression check: ensure dependency error maps to Dependencies dimension, not Code Quality
+    scores, breakdown = ScoreCalculator.calculate([finding])
+    assert scores["code_quality"] == 100.0
+    assert scores["dependencies"] == 97.0
+    assert len(breakdown["dependencies"]["penalties"]) == 1
+    assert breakdown["dependencies"]["penalties"][0]["penalty"] == 3.0
+    assert len(breakdown["code_quality"]["penalties"]) == 0
+
+
+def test_all_analyzers_error_finding_category_mapping(tmp_path):
+    assert BanditAnalyzer(tmp_path).create_error_finding("err").category == "security"
+    assert SemgrepAnalyzer(tmp_path).create_error_finding("err").category == "security"
+    assert ArchitectureAnalyzer(tmp_path).create_error_finding("err").category == "architecture"
+    assert DependencyAnalyzer(tmp_path).create_error_finding("err").category == "dependency"
+    assert RuffAnalyzer(tmp_path).create_error_finding("err").category == "quality"
+    assert HeuristicsAnalyzer(tmp_path).create_error_finding("err").category == "quality"
+

@@ -8,6 +8,9 @@ from app.config import settings
 
 
 class DependencyAnalyzer(BaseAnalyzer):
+    default_category = "dependency"
+    analyzer_name = "dependencies"
+
     def run(self) -> list[FindingData]:
         findings: list[FindingData] = []
 
